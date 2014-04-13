@@ -1,0 +1,223 @@
+/**
+ * Author: Christopher Sheaf
+ * Last Modified: 4-9-2014
+ *
+ * Other code files this file is dependent on:
+ *   'File_Operations.svl'
+ *   'UI_Elements.svl'
+ */
+
+#set main 'HomologyBatch';
+
+//Import outside functions:
+function pro_HomologyModel;
+function Chains;
+function ReadAuto;
+function GetFilesWithExtension;
+function CreateErrorPrompt;
+function CreateOptionsPrompt;
+
+//Forward-declare local functions:
+local function LoadTemplate;
+local function LoadSequences;
+local function LoadModelingOptions;
+local function CreateNewModelingOptions;
+
+/**
+ * Searches for all necessary files and then starts the batch modeling job.
+ */
+global function HomologyBatch [resourceDirectory]
+	resourceDirectory = 'Test';
+	//Load all needed external code files:
+	load 'File_Operations.svl';
+	load 'UI_Elements.svl';
+	
+	//Load all needed resources:
+	if length resourceDirectory == 0 then //If a resource directory was not specified, look for the files in the current directory:
+		resourceDirectory = '.';
+	endif
+	
+	local templateFile = LoadTemplate [resourceDirectory];
+	local sequenceFile = LoadSequences [resourceDirectory];
+	
+	
+	
+	local optionsLoaded = 0;
+	local i = 2; //Start at the first sequence (which is #2, since #1 is the template)
+	loop
+		local system = SystemPush [];
+		
+		if optionsLoaded == 0 then
+			local modelingOptions = LoadModelingOptions [resourceDirectory];
+			modelingOptions = modelingOptions(1)(1);
+			optionsLoaded = 1;
+		endif
+		
+		ReadAuto templateFile;
+		ReadAuto sequenceFile;
+		local sequenceChains = Chains [];
+		
+		local ubound = length sequenceChains;
+		print ubound;
+		
+		//Set the sequence to be modeled against the template, to each sequence in sequenceChains, one at a time:
+		modelingOptions.model = i;
+		local p = i - 1;
+		modelingOptions.moe_file = token cat [cat ["model_#", string totok p], ".moe"];
+		modelingOptions.db_file = token cat [cat ["model_#", string totok p], ".mdb"];
+		modelingOptions.seq1 = cName sequenceChains(i);
+		
+		print token cat ["Running Modeling Job #", string totok p];
+		pro_HomologyModel [sequenceChains, modelingOptions];
+		
+		SystemPop system;
+		
+		i = i + 1;
+	until i > ubound endloop
+	print 'Finished.';
+endfunction
+
+/**
+ * Searches for files with the extension .pdb in the specified directory.
+ * If more than one is found, the user is prompted to select one from the list.
+ */
+local function LoadTemplate [directory]
+	local pdbFiles = GetFilesWithExtension [directory, 'pdb'];
+	local selectedFile = [];
+	
+	//Determine the correct file (if possible):
+	if length pdbFiles == 1 then
+		selectedFile = pdbFiles;
+	elseif length pdbFiles > 1 then //We need a single .pdb File, so prompt the user if more than one is found:
+		selectedFile = CreateOptionsPrompt [
+			'Multiple .pdb files were found in this folder, but only one can be used as a template. Please select the .pdb file you would like to use as a template:',
+			pdbFiles
+		];
+	else
+		CreateErrorPrompt ['ERROR: No .pdb files were found to use as a template! Press \'Ok\' to exit.'];
+	endif
+	
+	//Load the file and return its identifier:
+	return selectedFile;
+endfunction
+
+/**
+ * Searches for files with the extension .fst in the specified directory.
+ * If more than one is found, the user is prompted to select one from the list.
+ */
+local function LoadSequences [directory]
+	local fstFiles = GetFilesWithExtension [directory, 'fst'];
+	local selectedFile = [];
+	
+	//Determine the correct file (if possible):
+	if length fstFiles == 1 then
+		selectedFile = fstFiles;
+	elseif length fstFiles > 1 then //We need a single .fst File, so prompt the user if more than one is found:
+		selectedFile = CreateOptionsPrompt [
+			'Multiple .fst files were found in this folder, but only one can be used. Please select the .fst file that contains the needed sequences:',
+			fstFiles
+		];
+	else
+		CreateErrorPrompt ['ERROR: No .fst files were found in this folder! Press \'Ok\' to exit.'];
+	endif
+	
+	//Load the file and return its identifier:
+	return selectedFile;
+endfunction
+
+/**
+ * Checks to see if a file named 'HomologyOptions.dat' exists. If it does, the options vector it contains is returned.
+ *
+ * If it doesn't, then a message informing the user that it does not exist will be displayed,
+ * with the choice of whether or not to create a new one. If 'no' is chosen, the script exits.
+ */
+local function LoadModelingOptions [directory]
+	local filePath = token cat [string directory, "/HomologyOptions.dat"];
+	local fileHandle = _fopenr filePath; //Load HomologyOptions.dat from file path: 'directory'/HomologyOptions.dat
+	local modelingOptions = [];
+	
+	if fileHandle == 0 then //If the file does not already exist:
+		local prompt = WindowCreate [
+			name: 'shell',
+			title: 'Warning: Not Found',
+			text: ['Yes, Create New', 'No, Exit Now'],
+			onTrigger: ['return', 'exit'],
+			bubbleHelp: ['Open the homology modeling options screen.', ''],
+			
+			Label: [
+				text: 'Warning: No existing homology batch options found. Would you like to create a new file with these options?',
+				margin: 1
+			]
+		];
+		WindowShow prompt;
+		WindowWait prompt;
+		WindowDestroy prompt;
+		
+		modelingOptions = CreateNewModelingOptions [directory];
+	else
+		modelingOptions = fread [fileHandle, '{v:}'];
+	endif
+	
+	return modelingOptions;
+endfunction
+
+local function CreateNewModelingOptions [directory]
+	local [chains, options] = run ['$MOE/lib/svl/run/promodel_ui.svl', [], 'pro_Model_Prompt'];
+	
+	//Write options to a file named 'HomologyOptions.dat':
+	local filePath = token cat [string directory, "/HomologyOptions.dat"];
+	local fileHandle = _fopenw filePath;
+
+	fwrite [fileHandle, '{v}', options];
+	fclose fileHandle;
+	
+	return options;
+endfunction
+
+/*
+[
+	panel:'OK',
+	promodel_options:[
+		loop_db:'$MOE/lib/pdb.mdb',
+		loop_codes:'$MOE/lib/segment.lis',
+		rotlib:'$MOE/lib/amino.mdb',
+		rot_maxD:1.2,
+		rot_Ecutoff:1.5
+	],
+	moe_file:'promodel.moe',
+	browse_moe_file:'Browse...',
+	db_file:'promodel.mdb',
+	browse_db_file:'Browse...',
+	dbv_open:0,
+	seq1:'Chain #2   wt_PfDHFR ',
+	seq2:'',
+	seq3:'',
+	seq4:'',
+	tmp1:'Chain #1   1j3i_no_nad... ',
+	tmp2:'',
+	tmp3:'',
+	tmp4:'',
+	selected_res:0,
+	ignore_outgaps:1,
+	env_atoms:0,
+	auto_disulfide:1,
+	nMainModels:10,
+	nSideModels:1,
+	sample_T:300,
+	intermediate_refine:'Medium',
+	intermediate_gtest:1,
+	model_score:'GB/VI',
+	final_refine:'Medium',
+	final_gtest:0.5,
+	protonate3D:1,
+	forcefield:'MMFF94x (Distance)',
+	pot_setup:'Potential Setup...',
+	model:2,
+	template:1,
+	loop_db:'$MOE/lib/pdb.mdb',
+	loop_codes:'$MOE/lib/segment.lis',
+	rotlib:'$MOE/lib/amino.mdb',
+	rot_maxD:1.2,
+	rot_Ecutoff:1.5
+]
+*/

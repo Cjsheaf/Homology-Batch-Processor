@@ -1,0 +1,53 @@
+/**
+ * Author: Christopher Sheaf
+ * Last Modified: 4-9-2014
+ */
+
+#set title 'UI Elements'
+
+global function CreateErrorPrompt [errorText]
+	local errorWindow = WindowCreate [
+			name: 'shell',
+			title: 'ERROR',
+			text: 'Ok',
+			onTrigger: 'exit',
+			
+			Label: [
+				text: errorText,
+				margin: 1
+			]
+		];
+		WindowShow errorWindow;
+		WindowWait errorWindow;
+endfunction
+
+global function CreateOptionsPrompt [promptText, promptChoices]
+	local selectWindow = WindowCreate [
+			name: 'shell',
+			title: 'Input Needed',
+			text: ['Select', 'Cancel'],
+			onTrigger: ['return', 'exit'],
+			
+			Label: [
+				text: promptText,
+				margin: 1
+			],
+			Option: [
+				name: 'OptionWidget',
+				text: promptChoices,
+				margin: 1,
+				minWidth: 30,
+				centerH: 1,
+				onTrigger: 'return'
+			]
+		];
+		WindowShow selectWindow;
+		
+		loop
+			local [values, trigger] = WindowWait selectWindow;
+			if trigger == 'shell' then
+				WindowDestroy selectWindow;
+				return values.OptionWidget; //Return the value last held by OptionWidget when the 'Select' button was pressed
+			endif
+		endloop
+endfunction

@@ -1,0 +1,17 @@
+/**
+ * Author: Christopher Sheaf
+ * Last Modified: 4-9-2014
+ */
+
+#set title 'File Operations'
+
+global function GetFilesWithExtension [directory, extension]
+	//Get all files fitting the pattern: "directory/*.extension":
+	local fileIdentifier = token cat ["*.", string extension];
+	local files = sort flist [directory, fileIdentifier];
+	return files;
+endfunction
+
+global function GetFileContentsAsVector [fileName]
+
+endfunction
