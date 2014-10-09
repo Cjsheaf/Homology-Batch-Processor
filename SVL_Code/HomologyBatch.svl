@@ -11,6 +11,7 @@
 
 //Import outside functions:
 function pro_HomologyModel;
+function pro_Align;
 function Chains;
 function ReadAuto;
 function GetFilesWithExtension;
@@ -66,6 +67,8 @@ global function HomologyBatch [resourceDirectory]
 		modelingOptions.moe_file = token cat [cat ["model_#", string totok p], ".moe"];
 		modelingOptions.db_file = token cat [cat ["model_#", string totok p], ".mdb"];
 		modelingOptions.seq1 = cName sequenceChains(i);
+
+        pro_Align [[sequenceChains(1), sequenceChains(i)], [verbose:1]]
 		
 		print token cat ["Running Modeling Job #", string totok p];
 		pro_HomologyModel [sequenceChains, modelingOptions];
@@ -141,8 +144,7 @@ local function LoadModelingOptions [directory]
 			name: 'shell',
 			title: 'Warning: Not Found',
 			text: ['Yes, Create New', 'No, Exit Now'],
-			onTrigger: ['return', 'exit'],
-			bubbleHelp: ['Open the homology modeling options screen.', ''],
+			onTrigger: ['return', 'exit'], bubbleHelp: ['Open the homology modeling options screen.', ''],
 			
 			Label: [
 				text: 'Warning: No existing homology batch options found. Would you like to create a new file with these options?',
@@ -154,8 +156,7 @@ local function LoadModelingOptions [directory]
 		WindowDestroy prompt;
 		
 		modelingOptions = CreateNewModelingOptions [directory];
-	else
-		modelingOptions = fread [fileHandle, '{v:}'];
+	else modelingOptions = fread [fileHandle, '{v:}'];
 	endif
 	
 	return modelingOptions;
