@@ -28,7 +28,6 @@ local function CreateNewModelingOptions;
  * Searches for all necessary files and then starts the batch modeling job.
  */
 global function HomologyBatch [resourceDirectory]
-	resourceDirectory = 'Test';
 	//Load all needed external code files:
 	load 'File_Operations.svl';
 	load 'UI_Elements.svl';
@@ -41,23 +40,21 @@ global function HomologyBatch [resourceDirectory]
 	local templateFile = LoadTemplate [resourceDirectory];
 	local sequenceFile = LoadSequences [resourceDirectory];
 	
-	
-	
 	local optionsLoaded = 0;
 	local i = 2; //Start at the first sequence (which is #2, since #1 is the template)
 	loop
 		local system = SystemPush [];
+		
+		ReadAuto templateFile;
+		ReadAuto sequenceFile;
+		local sequenceChains = Chains [];
 		
 		if optionsLoaded == 0 then
 			local modelingOptions = LoadModelingOptions [resourceDirectory];
 			modelingOptions = modelingOptions(1)(1);
 			optionsLoaded = 1;
 		endif
-		
-		ReadAuto templateFile;
-		ReadAuto sequenceFile;
-		local sequenceChains = Chains [];
-		
+
 		local ubound = length sequenceChains;
 		print ubound;
 		
@@ -68,7 +65,7 @@ global function HomologyBatch [resourceDirectory]
 		modelingOptions.db_file = token cat [cat ["model_#", string totok p], ".mdb"];
 		modelingOptions.seq1 = cName sequenceChains(i);
 
-        pro_Align [[sequenceChains(1), sequenceChains(i)], [verbose:1]]
+        pro_Align [[sequenceChains(1), sequenceChains(i)], [verbose:1]];
 		
 		print token cat ["Running Modeling Job #", string totok p];
 		pro_HomologyModel [sequenceChains, modelingOptions];
