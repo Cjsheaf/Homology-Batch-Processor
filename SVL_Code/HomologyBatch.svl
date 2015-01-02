@@ -19,28 +19,50 @@ function CreateErrorPrompt;
 function CreateOptionsPrompt;
 
 //Forward-declare local functions:
+local function RunBatch;
 local function LoadTemplate;
 local function LoadSequences;
 local function LoadModelingOptions;
 local function CreateNewModelingOptions;
 
-/**
- * Searches for all necessary files and then starts the batch modeling job.
- */
 global function HomologyBatch [resourceDirectory]
 	//Load all needed external code files:
 	load 'File_Operations.svl';
 	load 'UI_Elements.svl';
-	
-	//Load all needed resources:
+
+	//Search for and load all needed resources:
 	if length resourceDirectory == 0 then //If a resource directory was not specified, look for the files in the current directory:
 		resourceDirectory = '.';
 	endif
 	
+	local system = SystemPush [];
+	
 	local templateFile = LoadTemplate [resourceDirectory];
 	local sequenceFile = LoadSequences [resourceDirectory];
+	ReadAuto templateFile;
+	ReadAuto sequenceFile;
 	
-	local optionsLoaded = 0;
+	//The template and sequence files must be read before calling LoadModelingOptions, in case the function tries to create new modeling options.
+	//Modeling options cannot be created without an active template and sequence loaded.
+	local modelingOptions = LoadModelingOptions [resourceDirectory];
+	modelingOptions = modelingOptions(1)(1); //Strip away the outer vector, to get at the correct options.
+	
+	SystemPop system;
+	
+	RunBatch [modelingOptions, templateFile, sequenceFile];
+endfunction
+
+global function HomologyBatch_NoGUI [modelingOptions, templateFile, sequenceFile]
+	local options = fread [modelingOptions, '{v:}'];
+	options = options(1)(1); //Strip away the outer vector, to get at the correct options.
+	
+	RunBatch [options, templateFile, sequenceFile];
+endfunction
+
+/**
+ * Searches for all necessary files and then starts the batch modeling job.
+ */
+local function RunBatch [modelingOptions, templateFile, sequenceFile]
 	local i = 2; //Start at the first sequence (which is #2, since #1 is the template)
 	loop
 		local system = SystemPush [];
@@ -48,12 +70,6 @@ global function HomologyBatch [resourceDirectory]
 		ReadAuto templateFile;
 		ReadAuto sequenceFile;
 		local sequenceChains = Chains [];
-		
-		if optionsLoaded == 0 then
-			local modelingOptions = LoadModelingOptions [resourceDirectory];
-			modelingOptions = modelingOptions(1)(1);
-			optionsLoaded = 1;
-		endif
 
 		local ubound = length sequenceChains;
 		print ubound;
@@ -151,9 +167,10 @@ local function LoadModelingOptions [directory]
 		WindowShow prompt;
 		WindowWait prompt;
 		WindowDestroy prompt;
-		
+
 		modelingOptions = CreateNewModelingOptions [directory];
-	else modelingOptions = fread [fileHandle, '{v:}'];
+	else
+		modelingOptions = fread [fileHandle, '{v:}'];
 	endif
 	
 	return modelingOptions;
@@ -171,51 +188,3 @@ local function CreateNewModelingOptions [directory]
 	
 	return options;
 endfunction
-
-/*
-[
-	panel:'OK',
-	promodel_options:[
-		loop_db:'$MOE/lib/pdb.mdb',
-		loop_codes:'$MOE/lib/segment.lis',
-		rotlib:'$MOE/lib/amino.mdb',
-		rot_maxD:1.2,
-		rot_Ecutoff:1.5
-	],
-	moe_file:'promodel.moe',
-	browse_moe_file:'Browse...',
-	db_file:'promodel.mdb',
-	browse_db_file:'Browse...',
-	dbv_open:0,
-	seq1:'Chain #2   wt_PfDHFR ',
-	seq2:'',
-	seq3:'',
-	seq4:'',
-	tmp1:'Chain #1   1j3i_no_nad... ',
-	tmp2:'',
-	tmp3:'',
-	tmp4:'',
-	selected_res:0,
-	ignore_outgaps:1,
-	env_atoms:0,
-	auto_disulfide:1,
-	nMainModels:10,
-	nSideModels:1,
-	sample_T:300,
-	intermediate_refine:'Medium',
-	intermediate_gtest:1,
-	model_score:'GB/VI',
-	final_refine:'Medium',
-	final_gtest:0.5,
-	protonate3D:1,
-	forcefield:'MMFF94x (Distance)',
-	pot_setup:'Potential Setup...',
-	model:2,
-	template:1,
-	loop_db:'$MOE/lib/pdb.mdb',
-	loop_codes:'$MOE/lib/segment.lis',
-	rotlib:'$MOE/lib/amino.mdb',
-	rot_maxD:1.2,
-	rot_Ecutoff:1.5
-]
-*/

@@ -11,7 +11,3 @@ global function GetFilesWithExtension [directory, extension]
 	local files = sort flist [directory, fileIdentifier];
 	return files;
 endfunction
-
-global function GetFileContentsAsVector [fileName]
-
-endfunction
