@@ -65,25 +65,26 @@ endfunction
 local function RunBatch [modelingOptions, templateFile, sequenceFile]
 	local i = 2; //Start at the first sequence (which is #2, since #1 is the template)
 	loop
+		//A new environment is created, and the files are re-read each time to avoid strange errors with MOE.
 		local system = SystemPush [];
 		
 		ReadAuto templateFile;
 		ReadAuto sequenceFile;
 		local sequenceChains = Chains [];
-
 		local ubound = length sequenceChains;
 		print ubound;
 		
 		//Set the sequence to be modeled against the template, to each sequence in sequenceChains, one at a time:
 		modelingOptions.model = i;
-		local p = i - 1;
-		modelingOptions.moe_file = token cat [cat ["model_#", string totok p], ".moe"];
-		modelingOptions.db_file = token cat [cat ["model_#", string totok p], ".mdb"];
+		
+		//Name the new files the same as the chain that produced them
+		modelingOptions.moe_file = token cat [string cName sequenceChains(i), ".moe"];
+		modelingOptions.db_file = token cat [string cName sequenceChains(i), ".mdb"];
 		modelingOptions.seq1 = cName sequenceChains(i);
 
         pro_Align [[sequenceChains(1), sequenceChains(i)], [verbose:1]];
 		
-		print token cat ["Running Modeling Job #", string totok p];
+		print token cat ["Running Modeling Job #", string totok i - 1];
 		pro_HomologyModel [sequenceChains, modelingOptions];
 		
 		SystemPop system;
