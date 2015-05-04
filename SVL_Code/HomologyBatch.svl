@@ -7,7 +7,7 @@
  *   'UI_Elements.svl'
  */
 
-#set main 'HomologyBatch';
+#set main 'HomologyBatch_NoGUI';
 
 //Import outside functions:
 function pro_HomologyModel;
@@ -24,6 +24,9 @@ local function LoadTemplate;
 local function LoadSequences;
 local function LoadModelingOptions;
 local function CreateNewModelingOptions;
+local function ReadArgs;
+
+global argv;
 
 global function HomologyBatch [resourceDirectory]
 	//Load all needed external code files:
@@ -52,7 +55,8 @@ global function HomologyBatch [resourceDirectory]
 	RunBatch [modelingOptions, templateFile, sequenceFile];
 endfunction
 
-global function HomologyBatch_NoGUI [modelingOptions, templateFile, sequenceFile]
+global function HomologyBatch_NoGUI []
+	local [modelingOptions, templateFile, sequenceFile] = ReadArgs [];
 	local options = fread [modelingOptions, '{v:}'];
 	options = options(1)(1); //Strip away the outer vector, to get at the correct options.
 	
@@ -63,10 +67,12 @@ endfunction
  * Searches for all necessary files and then starts the batch modeling job.
  */
 local function RunBatch [modelingOptions, templateFile, sequenceFile]
+	print 'Running batch job...';
 	local i = 2; //Start at the first sequence (which is #2, since #1 is the template)
 	loop
 		//A new environment is created, and the files are re-read each time to avoid strange errors with MOE.
 		local system = SystemPush [];
+		pot_Load '$MOE/lib/Amber12EHT.ff';
 		
 		ReadAuto templateFile;
 		ReadAuto sequenceFile;
@@ -84,7 +90,7 @@ local function RunBatch [modelingOptions, templateFile, sequenceFile]
 
         pro_Align [[sequenceChains(1), sequenceChains(i)], [verbose:1]];
 		
-		print token cat ["Running Modeling Job #", string totok i - 1];
+		print token cat ["Running Modeling Job #", string totok [i - 1]];
 		pro_HomologyModel [sequenceChains, modelingOptions];
 		
 		SystemPop system;
@@ -188,4 +194,50 @@ local function CreateNewModelingOptions [directory]
 	fclose fileHandle;
 	
 	return options;
+endfunction
+
+local function ReadArgs[]
+	ArgvReset ArgvExpand argv;
+	if length cat ArgvPull [['-help', '--help'], 0] then
+		//The user invoked the -help or --help switch.
+		write ['Usage: moebatch -run HomologyBatch.svl -options FILE -template FILE -sequence FILE'];
+		
+		write ['\n\nThis script will read any number of sequences from an *.fst file, and perform a'];
+		write ['\nhomology model against the provided template file. A *.mdb and a *.moe file will be'];
+		write ['\ngenerated for each sequence, with both having the same name as the sequence they'];
+		write ['\nwere modeled on.'];
+		
+		write ['\n\nThe following options are REQUIRED for the script to run:'];
+		write ['\n  -options\t\tThe filename of the file containing the homology modeling'];
+		write ['\n\t\t\toptions.'];
+		write ['\n  -template\t\tThe filename of the *.pdb file which will be used as a'];
+		write ['\n\t\t\ttemplate. The sequence will be modeled against the molecule'];
+		write ['\n\t\t\tcontained in this file.'];
+		write ['\n  -sequence\t\tThe filename of the *.fst file that contains the sequence(s)'];
+		write ['\n\t\t\tthat the homology model will be performed with.'];
+		exit [];
+	endif
+	
+    local [modelingOptions, templateFile, sequenceFile] = ArgvPull [
+		['-options', '-template', '-sequence'],
+		1
+    ];
+	
+	if isnull modelingOptions then
+		write ['No modeling options file was was specified! Use the -options flag to specify one.'];
+		write ['\nUse the -help or --help flag for usage instructions.'];
+		exit [];
+	endif
+	if isnull templateFile then
+		write ['No template file was specified! Use the -template flag to specify one.'];
+		write ['\nUse the -help or --help flag for usage instructions.'];
+		exit [];
+	endif
+	if isnull sequenceFile then
+		write ['No sequence file was specified! Use the -sequence flag to specifly one.'];
+		write ['\nUse the -help or --help flag for usage instructions.'];
+		exit [];
+	endif
+	
+	return [modelingOptions, templateFile, sequenceFile];
 endfunction
